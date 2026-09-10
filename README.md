@@ -13,7 +13,7 @@
 # Requirements
 1. Google Chrome or Firefox (only tested on these two)
 2. Install and enable userscripts for [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-3. **[Click here to install the userscript](https://github.com/ImPotassium/quill-cheat/raw/main/code.js)**
+3. Then **[Click here to install the userscript](https://github.com/ImPotassium/quill-cheat/raw/main/code.js)**
 
 > **Recommended:** Install [Quill.org QoL Auto-focus & Enter to Next](https://greasyfork.org/en/scripts/578804-quill-org-qol-auto-focus-enter-to-next) with this script. it allows you to press enter to easily go to the next question.
 
