@@ -1,152 +1,427 @@
 // ==UserScript==
 // @name         Quill.org Cheat
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      1.0
 // @description  Get answers for Quill.org
-// @author       Caden Finkelstein
-// @match        https://www.quill.org/connect/*
+// @author       Potassium_
+// @match        https://www.quill.org/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=quill.org
 // @grant        none
+// @updateURL    https://github.com/ImPotassium/quill-cheat/raw/main/code.js
+// @downloadURL  https://github.com/ImPotassium/quill-cheat/raw/main/code.js
 // ==/UserScript==
 
 (function () {
     "use strict";
 
-    // Function to clear existing content
-    function clearContent() {
-      const contentDiv = document.querySelector("main");
+    let answersPanel = null;
+    let currentQuestionKey = null;
+    let lessonQuestions = [];
+
+    function injectStyles() {
       const styles = document.createElement("style");
-      styles.innerText = `
-      .questions {
-        color: red;
-        background: black;
-        z-index: 99;
-        position: absolute;
-      }
-      `
-      document.body.appendChild(styles);
-      if (contentDiv) {
-        console.log("Content container found.");
-      } else {
-        console.error("Content container not found.");
-      }
-    }
-
-    // Function to get URL parameters
-    function getUrlParams(url) {
-      const match = url.match(/\/lesson\/([^?#/]+)/);
-      if (match) {
-        const id = match[1];
-        return { id };
-      }
-      return { id: null }; // Return null if ID is not found
-    }
-
-    // Function to display questions and answers
-    function displayQuestionsAndAnswers(questions, responses) {
-      const contentDiv = document.querySelector("main");
-      if (contentDiv) {
-        questions.forEach((question, index) => {
-          const questionDiv = document.createElement("div");
-          questionDiv.className = "question";
-          questionDiv.textContent = `Question: ${question.key}`;
-          contentDiv.appendChild(questionDiv);
-
-          const responseDiv = document.createElement("div");
-          responseDiv.className="answer";
-          responseDiv.textContent = `Response: ${responses[index]}`;
-          contentDiv.appendChild(responseDiv);
-
-          const separator = document.createElement("hr");
-          contentDiv.appendChild(separator);
-        });
-      } else {
-        console.error("Content container not found.");
-      }
-    }
-
-    // Function to fetch responses for questions
-    async function fetchResponses(questions) {
-      const responses = [];
-      for (const question of questions) {
-        const questionId = question.key;
-        try {
-          const responseUrl = `https://cms.quill.org/questions/${questionId}/responses`;
-          const response = await fetch(responseUrl);
-          const responseData = await response.json();
-
-          // Check if responseData is an array of objects
-          if (
-            Array.isArray(responseData) &&
-            responseData.length > 0 &&
-            typeof responseData[0] === "object"
-          ) {
-            // Extract relevant information from each object and concatenate into a string
-            // const responseText = responseData.map((obj) => obj.text).join(", ");
-            // responses.push(responseText);
-            responses.push(responseData[0].text);
-          } else {
-            console.error(
-              `Invalid response data format for question ${questionId}`
-            );
-            responses.push("Error fetching response");
-          }
-        } catch (error) {
-          console.error(
-            `Error fetching responses for question ${questionId}:`,
-            error
-          );
-          responses.push("Error fetching response");
+      styles.textContent = `
+        .quill-cheat-panel {
+          position: fixed;
+          bottom: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 420px;
+          max-width: calc(100vw - 32px);
+          background: #ffffff;
+          color: #000000;
+          z-index: 999999;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          border: 2px solid #06806b;
+          border-radius: 12px;
+          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+          transition: transform 0.3s ease, opacity 0.3s ease;
         }
-      }
-      return responses;
+        .quill-cheat-panel.collapsed {
+          transform: translateX(-50%) translateY(calc(100% - 42px));
+        }
+        .quill-cheat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 16px;
+          cursor: pointer;
+          user-select: none;
+          background: #f8f8f8;
+          border-bottom: 1px solid #06806b;
+          border-radius: 10px 10px 0 0;
+        }
+        .quill-cheat-panel.collapsed .quill-cheat-header {
+          border-radius: 10px;
+          border-bottom: none;
+        }
+        .quill-cheat-header:hover {
+          background: #f0f0f0;
+        }
+        .quill-cheat-title {
+          font-weight: 700;
+          font-size: 14px;
+          color: #06806b;
+        }
+        .quill-cheat-toggle {
+          font-size: 16px;
+          color: #057360;
+          transition: transform 0.3s ease;
+        }
+        .quill-cheat-panel.collapsed .quill-cheat-toggle {
+          transform: rotate(180deg);
+        }
+        .quill-cheat-body {
+          max-height: 220px;
+          overflow-y: auto;
+          padding: 10px 12px;
+        }
+        .quill-cheat-body::-webkit-scrollbar {
+          width: 6px;
+        }
+        .quill-cheat-body::-webkit-scrollbar-track {
+          background: #f8f8f8;
+          border-radius: 3px;
+        }
+        .quill-cheat-body::-webkit-scrollbar-thumb {
+          background: #06806b;
+          border-radius: 3px;
+        }
+        .quill-cheat-card {
+          background: #f8f8f8;
+          border: 1px solid #06806b;
+          border-radius: 8px;
+          padding: 10px 14px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .quill-cheat-card:last-child {
+          margin-bottom: 0;
+        }
+        .quill-cheat-card:hover {
+          background: #06806b;
+          border-color: #057360;
+          transform: translateX(4px);
+        }
+        .quill-cheat-card:hover .quill-cheat-card-text {
+          color: #ffffff;
+        }
+        .quill-cheat-card-text {
+          flex: 1;
+          font-size: 14px;
+          line-height: 1.4;
+          color: #000000;
+        }
+        .quill-cheat-no-answers {
+          color: #888;
+          font-style: italic;
+          text-align: center;
+          padding: 16px;
+        }
+        .quill-cheat-loading {
+          color: #06806b;
+          text-align: center;
+          padding: 16px;
+          font-weight: 600;
+        }
+      `;
+      document.head.appendChild(styles);
     }
 
-    // Function to start the script
-    async function start() {
-      clearContent(); // Clear existing content
-      const currentUrl = window.location.href;
-      const { id } = getUrlParams(currentUrl);
-      const jsonUrl = `https://www.quill.org/api/v1/lessons/${id}.json`;
+    function createPanel() {
+      if (answersPanel) return answersPanel;
 
-      try {
-        const response = await fetch(jsonUrl);
-        const jsonData = await response.json();
-        const questions = jsonData.questions;
+      answersPanel = document.createElement("div");
+      answersPanel.className = "quill-cheat-panel collapsed";
+      answersPanel.id = "quill-cheat-answers";
 
-        const responses = await fetchResponses(questions);
-        displayQuestionsAndAnswers(questions, responses);
-      } catch (error) {
-        console.error("Error fetching JSON data:", error);
-      }
-    }
+      answersPanel.innerHTML = `
+        <div class="quill-cheat-header">
+          <span class="quill-cheat-title">Quill Answers</span>
+          <span class="quill-cheat-toggle">&#9650;</span>
+        </div>
+        <div class="quill-cheat-body">
+          <div class="quill-cheat-loading">Loading answers...</div>
+        </div>
+      `;
 
-    // Function to initialize the script
-    function initialize() {
-      const quillButton = document.querySelector(".quill-button");
-      if (quillButton) {
-        quillButton.addEventListener("click", start);
-      } else {
-        console.error("Quill button not found, waiting for it to appear.");
-        waitForQuillButton();
-      }
-    }
-
-    // Function to wait for the Quill button
-    function waitForQuillButton() {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          const quillButton = document.querySelector(".quill-button");
-          if (quillButton) {
-            observer.disconnect();
-            quillButton.addEventListener("click", start);
-            console.log("Quill button found and event listener attached.");
-          }
-        });
+      answersPanel.querySelector(".quill-cheat-header").addEventListener("click", () => {
+        answersPanel.classList.toggle("collapsed");
       });
 
-      observer.observe(document.body, { childList: true, subtree: true });
+      document.body.appendChild(answersPanel);
+      return answersPanel;
     }
 
-    // Call the initialize function
-    initialize();
+    function getLessonId() {
+      const hash = window.location.hash;
+      if (hash) {
+        const match = hash.match(/\/lesson\/([^?#/]+)/);
+        if (match) return match[1];
+      }
+      const pathMatch = window.location.pathname.match(/\/lesson\/([^?#/]+)/);
+      if (pathMatch) return pathMatch[1];
+      return null;
+    }
+
+    function getQuestionNumberFromPage() {
+      const paragraphs = Array.from(document.querySelectorAll("p"));
+      for (const p of paragraphs) {
+        const text = p.textContent.trim();
+        const match = text.match(/(\d+)\s+of\s+\d+/);
+        if (match) return parseInt(match[1], 10) - 1;
+      }
+      return null;
+    }
+
+    function isLessonComplete() {
+      const hash = window.location.hash;
+      if (hash.includes("/results") || hash.includes("/complete")) return true;
+      const allText = document.body.innerText || "";
+      if (allText.includes("You've completed the lesson")) return true;
+      if (allText.includes("Your results are being saved")) return true;
+      return false;
+    }
+
+    async function fetchResponsesForQuestion(questionKey) {
+      try {
+        const url = `https://cms.quill.org/questions/${questionKey}/responses`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!Array.isArray(data) || data.length === 0) return [];
+
+        const withText = data.filter((r) => r.text && r.text.trim());
+        if (withText.length === 0) return [];
+
+        const sorted = withText.sort((a, b) => {
+          if (a.optimal && !b.optimal) return -1;
+          if (!a.optimal && b.optimal) return 1;
+          return (b.count || 0) - (a.count || 0);
+        });
+
+        return sorted.slice(0, 5).map((r) => ({
+          text: r.text,
+          optimal: r.optimal,
+          count: r.count,
+        }));
+      } catch (error) {
+        console.error("Quill Cheat: Error fetching responses:", error);
+        return [];
+      }
+    }
+
+    function updatePanel(responses) {
+      if (!answersPanel) return;
+
+      const body = answersPanel.querySelector(".quill-cheat-body");
+      const optimal = responses.filter((r) => r.optimal);
+
+      if (optimal.length === 0) {
+        body.innerHTML = '<div class="quill-cheat-no-answers">No answers found for this question</div>';
+        answersPanel.classList.remove("collapsed");
+        return;
+      }
+
+      body.innerHTML = "";
+
+      optimal.forEach((response) => {
+        const card = document.createElement("div");
+        card.className = "quill-cheat-card";
+
+        const textEl = document.createElement("span");
+        textEl.className = "quill-cheat-card-text";
+        textEl.textContent = response.text;
+
+        card.appendChild(textEl);
+
+        card.addEventListener("click", () => insertAnswer(response.text));
+
+        body.appendChild(card);
+      });
+
+      answersPanel.classList.remove("collapsed");
+    }
+
+    function findInputField() {
+      const selectors = [
+        'textarea',
+        'input[type="text"]:not([readonly]):not([disabled])',
+        '[contenteditable="true"]'
+      ];
+      const elements = Array.from(document.querySelectorAll(selectors.join(", ")));
+      const visible = elements.filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+
+      if (visible.length === 0) return null;
+
+      const placeholderMatch = visible.find((el) => {
+        const ph = (el.placeholder || el.getAttribute("aria-placeholder") || "").toLowerCase();
+        return ph.includes("type your answer") || ph.includes("write your");
+      });
+      if (placeholderMatch) return placeholderMatch;
+
+      return visible[visible.length - 1];
+    }
+
+    function findMultipleChoiceButtons() {
+      const buttons = Array.from(document.querySelectorAll(
+        'button, [role="button"], label, .answer-option, .choice'
+      ));
+      return buttons.filter((el) => {
+        const rect = el.getBoundingClientRect();
+        const text = el.textContent.trim();
+        return rect.width > 0 && rect.height > 0 && text.length > 0 && text.length < 200;
+      });
+    }
+
+    function insertAnswer(text) {
+      const input = findInputField();
+
+      if (input) {
+        input.focus();
+
+        if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type === "text")) {
+          const nativeSet = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype, "value"
+          )?.set || Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, "value"
+          )?.set;
+
+          if (nativeSet) {
+            nativeSet.call(input, text);
+          } else {
+            input.value = text;
+          }
+
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+
+          const tracker = input._valueTracker;
+          if (tracker) tracker.setValue("");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        } else if (input.isContentEditable) {
+          input.textContent = text;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        return;
+      }
+
+      const mcButtons = findMultipleChoiceButtons();
+      const match = mcButtons.find((btn) => {
+        const btnText = btn.textContent.trim().toLowerCase();
+        return btnText === text.trim().toLowerCase();
+      });
+      if (match) {
+        match.click();
+        return;
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        showCopiedToast();
+      }).catch(() => {});
+    }
+
+    function showCopiedToast() {
+      const toast = document.createElement("div");
+      toast.textContent = "Answer copied to clipboard";
+      toast.style.cssText = `
+        position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+        background: #06806b; color: white; padding: 8px 20px; border-radius: 6px;
+        font-size: 13px; font-weight: 600; z-index: 9999999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+
+    async function loadLesson() {
+      const lessonId = getLessonId();
+      if (!lessonId) return;
+
+      try {
+        const url = `https://www.quill.org/api/v1/lessons/${lessonId}.json`;
+        const response = await fetch(url);
+        const data = await response.json();
+        lessonQuestions = data.questions || [];
+      } catch (error) {
+        console.error("Quill Cheat: Error loading lesson:", error);
+      }
+    }
+
+    async function onQuestionChange() {
+      if (isLessonComplete()) return;
+
+      const questionIndex = getQuestionNumberFromPage();
+      if (questionIndex === null) return;
+
+      if (lessonQuestions.length === 0) {
+        await loadLesson();
+      }
+
+      if (questionIndex >= lessonQuestions.length) return;
+
+      const questionKey = lessonQuestions[questionIndex].key;
+      if (questionKey === currentQuestionKey) return;
+      currentQuestionKey = questionKey;
+
+      const body = answersPanel?.querySelector(".quill-cheat-body");
+      if (body) body.innerHTML = '<div class="quill-cheat-loading">Loading answers...</div>';
+
+      const responses = await fetchResponsesForQuestion(questionKey);
+      updatePanel(responses);
+    }
+
+    function watchForInput() {
+      const observer = new MutationObserver(() => {
+        if (isLessonComplete()) return;
+        const input = findInputField();
+        if (input) {
+          onQuestionChange();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    function watchUrlChange() {
+      let lastQuestionNumber = null;
+
+      setInterval(() => {
+        if (isLessonComplete()) {
+          if (answersPanel) answersPanel.style.display = "none";
+          return;
+        }
+        if (answersPanel) answersPanel.style.display = "";
+
+        const currentNumber = getQuestionNumberFromPage();
+        if (currentNumber !== null && currentNumber !== lastQuestionNumber) {
+          lastQuestionNumber = currentNumber;
+          currentQuestionKey = null;
+          onQuestionChange();
+        }
+      }, 500);
+    }
+
+    function init() {
+      injectStyles();
+      createPanel();
+      loadLesson();
+      watchUrlChange();
+      watchForInput();
+
+      setTimeout(onQuestionChange, 1500);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
   })();
