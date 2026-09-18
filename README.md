@@ -7,12 +7,14 @@
  \___\_\\__,_|_||_|_|    \_____|_| |_|\___| \__,__|  \__|
 </pre>
 
+Displays and pastes optimal responces because every responce for every question in every lesson is in Quill's public API.
+
 # Installation
 1. Google Chrome or Firefox (only tested on these two)
 2. Install and enable userscripts for [Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
 3. Then **[Click here to install the userscript](https://github.com/ImPotassium/quill-cheat/raw/main/Quill.org%20Cheat.user.js)**
 
-> **Recommended:** Install [Quill.org QoL Auto-focus & Enter to Next](https://greasyfork.org/en/scripts/578804-quill-org-qol-auto-focus-enter-to-next) with this script. it allows you to press enter to easily go to the next question.
+> **Recommended:** Install [Quill.org QoL Auto-focus & Enter to Next](https://greasyfork.org/en/scripts/578804-quill-org-qol-auto-focus-enter-to-next). This script allows you to press enter to easily go to the next question.
 
 # Structure / Documentation
 ## How it works
@@ -31,7 +33,7 @@ https://www.quill.org/connect/#/play/lesson/{lessonId}?activities={activityIndex
 
 ### Step 1 — Get lesson data
 ```
-GET https://www.quill.org/api/v1/lessons/{lessonId}.json
+https://www.quill.org/api/v1/lessons/{lessonId}.json
 ```
 Returns a JSON object with a `questions` array. Each question has a `key` field used in Step 2.
 
@@ -51,7 +53,7 @@ Example response structure:
 
 #### Written Responses
 ```
-GET https://cms.quill.org/questions/{questionKey}/responses
+https://cms.quill.org/questions/{questionKey}/responses
 ```
 Returns an array of response objects:
 ```json
@@ -71,7 +73,7 @@ Returns an array of response objects:
 
 #### Multiple Choice Responses
 ```
-GET https://cms.quill.org/questions/{questionKey}/multiple_choice_options
+https://cms.quill.org/questions/{questionKey}/multiple_choice_options
 ```
 Returns the same format as written responses.
 
