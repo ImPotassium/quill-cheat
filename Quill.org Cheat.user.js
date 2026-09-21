@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Quill.org Cheat
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.0.1
 // @description  Get answers for Quill.org
 // @author       Potassium_
 // @match        https://www.quill.org/*
