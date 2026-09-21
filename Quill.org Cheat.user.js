@@ -7,8 +7,8 @@
 // @match        https://www.quill.org/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=quill.org
 // @grant        none
-// @updateURL    https://github.com/ImPotassium/quill-cheat/raw/main/code.js
-// @downloadURL  https://github.com/ImPotassium/quill-cheat/raw/main/code.js
+// @updateURL    https://github.com/ImPotassium/quill-cheat/raw/main/Quill.org%20Cheat.user.js
+// @downloadURL  https://github.com/ImPotassium/quill-cheat/raw/main/Quill.org%20Cheat.user.js
 // ==/UserScript==
 
 (function () {
